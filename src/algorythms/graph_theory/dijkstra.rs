@@ -4,24 +4,51 @@ use super::Solver;
 pub use super::Vertices;
 
 #[derive(Debug)]
-enum VertexState {
+pub enum VertexState {
     Unexplored,
-    Estimated(usize, Option<usize>),
-    Explored(usize, Option<usize>),
+    Estimated {
+        current_score: usize,
+        coming_from: Option<usize>,
+    },
+    Explored {
+        score: usize,
+        coming_from: Option<usize>,
+    },
 }
 
 impl VertexState {
+    fn is_explored(&self) -> bool {
+        match self {
+            VertexState::Explored { .. } => true,
+            _ => false,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn is_estimated(&self) -> bool {
+        match self {
+            VertexState::Estimated { .. } => true,
+            _ => false,
+        }
+    }
+    #[allow(dead_code)]
+    fn is_unexplored(&self) -> bool {
+        match self {
+            VertexState::Unexplored => true,
+            _ => false,
+        }
+    }
     fn get_score(&self) -> Option<usize> {
         match self {
-            VertexState::Explored(score, _) => Some(score.clone()),
-            VertexState::Estimated(score, _) => Some(score.clone()),
+            VertexState::Explored { score, .. } => Some(score.clone()),
+            VertexState::Estimated { current_score, .. } => Some(current_score.clone()),
             VertexState::Unexplored => None,
         }
     }
-    fn get_previous(&self) -> Option<usize> {
+    fn get_path_backwards(&self) -> Option<usize> {
         match self {
-            VertexState::Explored(_, previous_label) => previous_label.clone(),
-            VertexState::Estimated(_, previous_label) => previous_label.clone(),
+            VertexState::Explored { coming_from, .. } => coming_from.clone(),
+            VertexState::Estimated { coming_from, .. } => coming_from.clone(),
             VertexState::Unexplored => None,
         }
     }
@@ -34,7 +61,7 @@ impl PartialEq for VertexState {
 }
 
 impl Vertices {
-    fn explore(&self, start: &usize) -> Result<HashMap<usize, VertexState>, String> {
+    fn explore(&self, start: &usize, end: &usize) -> Result<HashMap<usize, VertexState>, String> {
         let mut state = HashMap::new();
 
         // make all unexplored
@@ -47,13 +74,23 @@ impl Vertices {
             // start at score 0
             state.insert(
                 current_vertex.as_ref().borrow().label(),
-                VertexState::Explored(0, None),
+                VertexState::Explored {
+                    score: 0,
+                    coming_from: None,
+                },
             );
             let mut current_vertex = current_vertex;
+
             // run while there are vertices that are still not completely explored
             while state
-                .values()
-                .find(|state| state != &&VertexState::Estimated(0, None))
+                .get(end)
+                .and_then(|targets_state| {
+                    if targets_state.is_explored() {
+                        None //=> done, do nothing more
+                    } else {
+                        Some(true) //=> keep exploring
+                    }
+                })
                 .is_some()
             {
                 let current_vertex_label = current_vertex.as_ref().borrow().label();
@@ -64,10 +101,10 @@ impl Vertices {
 
                 state.insert(
                     current_vertex_label,
-                    VertexState::Explored(
-                        current_vertex_score,
-                        state[&current_vertex_label].get_previous(),
-                    ),
+                    VertexState::Explored {
+                        score: current_vertex_score,
+                        coming_from: state[&current_vertex_label].get_path_backwards(),
+                    },
                 );
 
                 // update all surrounding values according to current_vertex
@@ -81,20 +118,33 @@ impl Vertices {
                         } else {
                             new_potential_score
                         };
-                    if state.get(&target_vertex_label) != Some(&VertexState::Explored(0, None)) {
+                    if state
+                        .get(&target_vertex_label)
+                        .and_then(|target_state| {
+                            if target_state.is_explored() {
+                                None
+                            } else {
+                                Some(true)
+                            }
+                        })
+                        .is_some()
+                    {
                         state.insert(
                             target_vertex_label,
-                            VertexState::Estimated(new_score, Some(current_vertex_label)),
+                            VertexState::Estimated {
+                                coming_from: Some(current_vertex_label),
+                                current_score: new_score,
+                            },
                         );
                     }
                 }
 
                 // find the lowest unexplored value and set to current_vertex
+
                 let mut lowest_score = None;
                 let mut lowest_label = 0;
-                for (next_label, next_state) in state
-                    .iter()
-                    .filter(|(_label, state)| state != &&VertexState::Explored(0, None))
+                for (next_label, next_state) in
+                    state.iter().filter(|(_label, state)| !state.is_explored())
                 {
                     if let Some(value) = next_state.get_score() {
                         if match lowest_score {
@@ -107,8 +157,18 @@ impl Vertices {
                     }
                 }
 
-                if lowest_score.is_none() {
-                    return Ok(state);
+                if lowest_score.is_none()
+                    && state
+                        .values()
+                        .filter(|state| state.is_unexplored())
+                        .collect::<Vec<&VertexState>>()
+                        .len()
+                        > 0
+                {
+                    return Err(format!(
+                        "there is no way for getting from {} to {}. There is a loop.",
+                        start, end
+                    ));
                 }
 
                 if let Some(lowest_vertex) = self.find(&lowest_label) {
@@ -127,40 +187,34 @@ impl Vertices {
         }
     }
 }
-fn contains_duplicate(mut nums: Vec<i32>) -> bool {
-    nums.sort();
-    for i in 1..nums.len() {
-        if nums[i] == nums[i - 1] {
-            return true;
-        }
-    }
-    return false;
-}
+
 impl Solver for Vertices {
-    fn shortest_path(&self, a: &usize, b: &usize) -> Vec<usize> {
-        if let Ok(state) = self.explore(a) {
-            // panic!("{:?}", state);
-
-            let mut current_pointer = b.clone();
-            let mut path = vec![];
-            path.push(current_pointer.clone());
-            while &path[path.len() - 1] != a {
-                match state.get(&current_pointer).unwrap().get_previous() {
-                    Some(previous) => {
-                        current_pointer = previous;
-                        path.push(current_pointer);
+    fn shortest_path(&self, a: &usize, b: &usize) -> Result<Vec<usize>, String> {
+        match self.explore(a, b) {
+            Ok(state) => {
+                let mut current_pointer = b.clone();
+                let mut path = vec![];
+                path.push(current_pointer.clone());
+                while &path[path.len() - 1] != a {
+                    match state.get(&current_pointer).unwrap().get_path_backwards() {
+                        Some(previous) => {
+                            current_pointer = previous;
+                            path.push(current_pointer);
+                        }
+                        None => {
+                            println!(
+                                "could not reverse path from {:?}. state: {:?}",
+                                current_pointer, state
+                            );
+                            break;
+                        }
                     }
-                    _ => break,
                 }
-                if contains_duplicate(path) {
-                    return path;
-                }
-            }
 
-            path.reverse();
-            path
-        } else {
-            vec![]
+                path.reverse();
+                Ok(path)
+            }
+            Err(content) => Err(content),
         }
     }
 }

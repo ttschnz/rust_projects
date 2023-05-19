@@ -210,7 +210,7 @@ impl Vertices {
 }
 pub trait Solver {
     /// finds the shortest path from a to b (by their IDs) and returns the path (also using IDs of vertices).
-    fn shortest_path(&self, a: &usize, b: &usize) -> Vec<usize>;
+    fn shortest_path(&self, a: &usize, b: &usize) -> Result<Vec<usize>, String>;
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

@@ -212,6 +212,8 @@ mod graph_theory {
         graph
     }
     mod dijkstra {
+        use core::panic;
+
         use super::super::super::graph_theory::dijkstra::Vertices;
         use super::generate_graph;
         use crate::algorythms::graph_theory::Solver;
@@ -220,35 +222,54 @@ mod graph_theory {
             let vertices = Vertices::from_config(vec![vec![1], vec![0, 2], vec![1]])
                 .expect("could not create vertices from config");
 
-            assert_eq!(vec![0, 1, 2], vertices.shortest_path(&0, &2));
+            match vertices.shortest_path(&0, &2) {
+                Ok(path) => assert_eq!(vec![0, 1, 2], path),
+                Err(err) => panic!("{}", err),
+            }
         }
+        #[test]
         fn finds_shortest_path_10() {
-            let config = generate_graph(10, 5)
-            let vertices = Vertices::from_config(config)
-                .expect("could not create vertices from config");
+            let config = generate_graph(10, 5);
+            let vertices =
+                Vertices::from_config(config).expect("could not create vertices from config");
 
-            assert_eq!(vec![0, 1, 2], vertices.shortest_path(&0, &2));
+            match vertices.shortest_path(&0, &2) {
+                Ok(_path) => {}
+                Err(err) => panic!("{}", err),
+            }
         }
+        #[test]
         fn finds_shortest_path_100() {
-            let config = generate_graph(100, 50)
-            let vertices = Vertices::from_config(config)
-                .expect("could not create vertices from config");
+            let config = generate_graph(100, 50);
+            let vertices =
+                Vertices::from_config(config).expect("could not create vertices from config");
 
-            assert_eq!(vec![0, 1, 2], vertices.shortest_path(&0, &2));
+            match vertices.shortest_path(&0, &2) {
+                Ok(_path) => {}
+                Err(err) => panic!("{}", err),
+            }
         }
+        #[test]
         fn finds_shortest_path_1000() {
-            let config = generate_graph(1000, 500)
-            let vertices = Vertices::from_config(config)
-                .expect("could not create vertices from config");
+            let config = generate_graph(1000, 50);
+            let vertices =
+                Vertices::from_config(config).expect("could not create vertices from config");
 
-            assert_eq!(vec![0, 1, 2], vertices.shortest_path(&0, &2));
+            match vertices.shortest_path(&0, &2) {
+                Ok(_path) => {}
+                Err(err) => panic!("{}", err),
+            }
         }
+        #[test]
         fn finds_shortest_path_10000() {
-            let config = generate_graph(10000, 5000)
-            let vertices = Vertices::from_config(config)
-                .expect("could not create vertices from config");
+            let config = generate_graph(10000, 50);
+            let vertices =
+                Vertices::from_config(config).expect("could not create vertices from config");
 
-            assert_eq!(vec![0, 1, 2], vertices.shortest_path(&0, &2));
+            match vertices.shortest_path(&0, &2) {
+                Ok(_path) => {}
+                Err(err) => panic!("{}", err),
+            }
         }
     }
 }
