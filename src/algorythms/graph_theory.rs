@@ -97,9 +97,10 @@ pub struct Vertices {
     // edges:
 }
 #[derive(Debug)]
-pub enum VerticesInsertionError {
+pub enum VerticesManipulationError {
     Duplicate,
     NotFoundAfterInsert,
+    NotFound,
 }
 
 impl Deref for Vertices {
@@ -124,23 +125,23 @@ impl Vertices {
     pub fn insert(
         &mut self,
         vertex: Vertex,
-    ) -> Result<Rc<RefCell<Vertex>>, VerticesInsertionError> {
+    ) -> Result<Rc<RefCell<Vertex>>, VerticesManipulationError> {
         let label = vertex.label();
         let vertex = Rc::new(RefCell::new(vertex));
         if self.find(&vertex.borrow().label()).is_some() {
-            return Err(VerticesInsertionError::Duplicate);
+            return Err(VerticesManipulationError::Duplicate);
         }
         self.vertices.insert(label, vertex);
         match self.find(&label) {
             Some(r) => Ok(r),
-            None => Err(VerticesInsertionError::NotFoundAfterInsert),
+            None => Err(VerticesManipulationError::NotFoundAfterInsert),
         }
     }
 
     pub fn create_and_insert(
         &mut self,
         label: &usize,
-    ) -> Result<Rc<RefCell<Vertex>>, VerticesInsertionError> {
+    ) -> Result<Rc<RefCell<Vertex>>, VerticesManipulationError> {
         let vertex = Vertex::new(label);
         self.insert(vertex)
     }
@@ -153,8 +154,9 @@ impl Vertices {
         )
     }
 
-    pub fn from_config(config: Vec<Vec<usize>>) -> Vertices {
+    pub fn from_config(config: Vec<Vec<usize>>) -> Result<Vertices, VerticesManipulationError> {
         let mut vertices = Vertices::new();
+        let mut error = None;
         config
             .iter()
             .enumerate()
@@ -162,35 +164,53 @@ impl Vertices {
                 vertices.find_or_create(&current_index);
                 sub_config.iter().for_each(|target_index| {
                     vertices.find_or_create(target_index);
-                    vertices.add_connection(&current_index, &target_index, &1, Direction::Forward);
+                    if let Err(err) = vertices.add_connection(
+                        &current_index,
+                        &target_index,
+                        &1,
+                        Direction::Forward,
+                    ) {
+                        error = Some(err);
+                    }
                 })
             });
-        vertices
-    }
-    pub fn add_connection(&self, from: &usize, to: &usize, weight: &usize, direction: Direction) {
-        match (self.find(from), self.find(to)) {
-            (Some(start), Some(end)) => {
-                if let Some(edge) = match direction {
-                    Direction::Forward => {
-                        Some(Rc::new(RefCell::new(Edge::new(weight, &start, &end))))
-                    }
-                    Direction::Reverse => {
-                        // reverse goes from end to start
-                        Some(Rc::new(RefCell::new(Edge::new(weight, &end, &start))))
-                    }
-                    Direction::Bidirectional => {
-                        // bidirectional has two edges, one forward and another reverse
-                        self.add_connection(from, to, weight, Direction::Forward);
-                        self.add_connection(from, to, weight, Direction::Reverse);
-                        None
-                    }
-                } {
-                    edge.borrow().vertices().0.borrow_mut().add_edge(&edge)
-                }
-            }
-            _ => {}
+        if let Some(err) = error {
+            Err(err)
+        } else {
+            Ok(vertices)
         }
     }
+
+    pub fn add_connection(
+        &self,
+        from: &usize,
+        to: &usize,
+        weight: &usize,
+        direction: Direction,
+    ) -> Result<(), VerticesManipulationError> {
+        match direction {
+            Direction::Bidirectional => self
+                .add_connection(from, to, weight, Direction::Forward)
+                .and(self.add_connection(from, to, weight, Direction::Reverse)),
+            Direction::Reverse => self.add_connection(to, from, weight, Direction::Forward),
+            Direction::Forward => {
+                if let (Some(vertex_from), Some(vertex_to)) = (self.find(from), self.find(to)) {
+                    let edge = Edge::new(weight, &vertex_from, &vertex_to);
+                    edge.vertices()
+                        .0
+                        .borrow_mut()
+                        .add_edge(&Rc::new(RefCell::new(edge)));
+                    Ok(())
+                } else {
+                    Err(VerticesManipulationError::NotFound)
+                }
+            }
+        }
+    }
+}
+pub trait Solver {
+    /// finds the shortest path from a to b (by their IDs) and returns the path (also using IDs of vertices).
+    fn shortest_path(&self, a: &usize, b: &usize) -> Vec<usize>;
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

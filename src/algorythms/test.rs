@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod graph_theory {
     use super::super::graph_theory::*;
+    use rand::Rng;
     use std::{cell::RefCell, rc::Rc};
     #[test]
     fn can_create_vertex() {
@@ -31,7 +32,9 @@ mod graph_theory {
             .create_and_insert(&1)
             .expect("Could not create vertex");
 
-        vertices.add_connection(&0, &1, &5, Direction::Bidirectional);
+        vertices
+            .add_connection(&0, &1, &5, Direction::Bidirectional)
+            .expect(&format!("could not add connection between {} and {}", 0, 1));
 
         for label in 0..=1 {
             match vertices.find(&label) {
@@ -70,7 +73,9 @@ mod graph_theory {
             .create_and_insert(&1)
             .expect("Could not create vertex");
 
-        vertices.add_connection(&0, &1, &5, Direction::Forward);
+        vertices
+            .add_connection(&0, &1, &5, Direction::Forward)
+            .expect(&format!("could not add connection between {} and {}", 0, 1));
 
         // vertex 0 should only have one edge
         if let Some(vertex) = vertices.get(&0) {
@@ -112,7 +117,9 @@ mod graph_theory {
             .create_and_insert(&1)
             .expect("Could not create vertex");
 
-        vertices.add_connection(&0, &1, &5, Direction::Reverse);
+        vertices
+            .add_connection(&0, &1, &5, Direction::Reverse)
+            .expect(&format!("could not add connection between {} and {}", 0, 1));
 
         // vertex 1 should only have one edge
         if let Some(vertex) = vertices.get(&1) {
@@ -144,7 +151,8 @@ mod graph_theory {
     #[test]
     fn can_translate_config() {
         let config = vec![vec![1, 2, 3], vec![3], vec![1, 3], vec![0, 1, 2]];
-        let vertices = Vertices::from_config(config.clone());
+        let vertices =
+            Vertices::from_config(config.clone()).expect("could not generate vertices from config");
 
         config.iter().enumerate().for_each(|(label, connections)| {
             let from = match vertices.find(&label) {
@@ -187,5 +195,60 @@ mod graph_theory {
                 from
             );
         });
+    }
+
+    fn generate_graph(n: usize, x: usize) -> Vec<Vec<usize>> {
+        let mut rng = rand::thread_rng();
+        let mut graph: Vec<Vec<usize>> = vec![Vec::new(); n];
+
+        for node in 0..n {
+            let outgoing_connections = rng.gen_range(1..=x);
+            for _ in 0..outgoing_connections {
+                let target = rng.gen_range(0..n);
+                graph[node].push(target);
+            }
+        }
+
+        graph
+    }
+    mod dijkstra {
+        use super::super::super::graph_theory::dijkstra::Vertices;
+        use super::generate_graph;
+        use crate::algorythms::graph_theory::Solver;
+        #[test]
+        fn finds_shortest_path_1() {
+            let vertices = Vertices::from_config(vec![vec![1], vec![0, 2], vec![1]])
+                .expect("could not create vertices from config");
+
+            assert_eq!(vec![0, 1, 2], vertices.shortest_path(&0, &2));
+        }
+        fn finds_shortest_path_10() {
+            let config = generate_graph(10, 5)
+            let vertices = Vertices::from_config(config)
+                .expect("could not create vertices from config");
+
+            assert_eq!(vec![0, 1, 2], vertices.shortest_path(&0, &2));
+        }
+        fn finds_shortest_path_100() {
+            let config = generate_graph(100, 50)
+            let vertices = Vertices::from_config(config)
+                .expect("could not create vertices from config");
+
+            assert_eq!(vec![0, 1, 2], vertices.shortest_path(&0, &2));
+        }
+        fn finds_shortest_path_1000() {
+            let config = generate_graph(1000, 500)
+            let vertices = Vertices::from_config(config)
+                .expect("could not create vertices from config");
+
+            assert_eq!(vec![0, 1, 2], vertices.shortest_path(&0, &2));
+        }
+        fn finds_shortest_path_10000() {
+            let config = generate_graph(10000, 5000)
+            let vertices = Vertices::from_config(config)
+                .expect("could not create vertices from config");
+
+            assert_eq!(vec![0, 1, 2], vertices.shortest_path(&0, &2));
+        }
     }
 }
