@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use itertools::Itertools;
+
 use super::Solver;
 pub use super::Vertices;
 
@@ -65,126 +67,116 @@ impl Vertices {
         let mut state = HashMap::new();
 
         // make all unexplored
-        self.vertices.keys().for_each(|key| {
+        for key in self.vertices.keys() {
             state.insert(key.clone(), VertexState::Unexplored);
-        });
+        }
 
-        let current_vertex = self.find(start);
-        if let Some(current_vertex) = current_vertex {
-            // start at score 0
-            state.insert(
-                current_vertex.as_ref().borrow().label(),
-                VertexState::Explored {
-                    score: 0,
-                    coming_from: None,
-                },
-            );
-            let mut current_vertex = current_vertex;
+        // start at the vertex with id `start`
+        // let current_vertex = if let Some(starting_vertex) = self.find(start) {
+        //     starting_vertex
+        // } else {
+        //     return Err("could not find start vertex".to_string());
+        // };
+        let mut visiting_vertex = self.find(start).ok_or("could not find start vertex")?;
+        let mut visiting_label = *start;
+        let mut visiting_score = 0;
 
-            // run while there are vertices that are still not completely explored
-            while state
-                .get(end)
-                .and_then(|targets_state| {
-                    if targets_state.is_explored() {
-                        None //=> done, do nothing more
-                    } else {
-                        Some(true) //=> keep exploring
-                    }
-                })
-                .is_some()
-            {
-                let current_vertex_label = current_vertex.as_ref().borrow().label();
-                let current_vertex_score = match state[&current_vertex_label].get_score() {
-                    Some(score) => score,
-                    _ => 0,
-                };
+        // start at score 0
+        state.insert(
+            visiting_label,
+            VertexState::Explored {
+                score: visiting_score,
+                coming_from: None,
+            },
+        );
 
-                state.insert(
-                    current_vertex_label,
-                    VertexState::Explored {
-                        score: current_vertex_score,
-                        coming_from: state[&current_vertex_label].get_path_backwards(),
+        // run while there are vertices that are still not completely explored
+        while !state
+            .get(end)
+            .ok_or("could not find end vertex")?
+            .is_explored()
+        {
+            // update all surrounding values according to visiting
+            for (adjacent_vertex, weight) in visiting_vertex.borrow().weighted_adjacent_vertices() {
+                let adjacent_vertex_label = adjacent_vertex.as_ref().borrow().label();
+
+                if !state
+                    .get(&adjacent_vertex_label)
+                    .ok_or(format!(
+                        "could not find adjacent vertex {}",
+                        adjacent_vertex_label
+                    ))?
+                    .is_explored()
+                {
+                    state.insert(
+                        adjacent_vertex_label,
+                        VertexState::Estimated {
+                            coming_from: Some(visiting_label),
+                            current_score: state[&adjacent_vertex_label]
+                                .get_score()
+                                .and_then(|curr_score| {
+                                    Some(std::cmp::max(curr_score, visiting_score + weight))
+                                })
+                                .unwrap_or(visiting_score + weight),
+                        },
+                    );
+                }
+            }
+
+            // find the lowest unexplored value and set to visiting_label
+            if let Some((lowest_label, _score)) = state
+                .iter()
+                .filter_map(
+                    |(label, state)| match (state.is_estimated(), state.get_score()) {
+                        (true, Some(score)) => Some((label, score)),
+                        _ => None,
                     },
-                );
-
-                // update all surrounding values according to current_vertex
-                for edge in current_vertex.as_ref().borrow().edges() {
-                    let target_vertex_label = edge.as_ref().borrow().to.as_ref().borrow().label();
-                    let new_potential_score =
-                        current_vertex_score + edge.as_ref().borrow().weight();
-                    let new_score =
-                        if let Some(comparing_score) = state[&target_vertex_label].get_score() {
-                            std::cmp::max(comparing_score, new_potential_score)
-                        } else {
-                            new_potential_score
-                        };
-                    if state
-                        .get(&target_vertex_label)
-                        .and_then(|target_state| {
-                            if target_state.is_explored() {
-                                None
-                            } else {
-                                Some(true)
-                            }
-                        })
-                        .is_some()
-                    {
-                        state.insert(
-                            target_vertex_label,
-                            VertexState::Estimated {
-                                coming_from: Some(current_vertex_label),
-                                current_score: new_score,
-                            },
-                        );
-                    }
-                }
-
-                // find the lowest unexplored value and set to current_vertex
-
-                let mut lowest_score = None;
-                let mut lowest_label = 0;
-                for (next_label, next_state) in
-                    state.iter().filter(|(_label, state)| !state.is_explored())
-                {
-                    if let Some(value) = next_state.get_score() {
-                        if match lowest_score {
-                            Some(lowest_score_value) => lowest_score_value > value,
-                            _ => true,
-                        } {
-                            lowest_score = Some(value);
-                            lowest_label = next_label.clone();
-                        }
-                    }
-                }
-
-                if lowest_score.is_none()
-                    && state
-                        .values()
-                        .filter(|state| state.is_unexplored())
-                        .collect::<Vec<&VertexState>>()
-                        .len()
-                        > 0
-                {
-                    return Err(format!(
-                        "there is no way for getting from {} to {}. There is a loop.",
-                        start, end
-                    ));
-                }
-
+                )
+                .sorted_by_key(|set| set.1)
+                .nth(0)
+            {
                 if let Some(lowest_vertex) = self.find(&lowest_label) {
-                    current_vertex = lowest_vertex;
+                    visiting_vertex = lowest_vertex;
                 } else {
                     return Err(format!(
                         "could not find vertex for lowest label: {}",
                         lowest_label
                     ));
                 }
-            }
 
-            Ok(state)
-        } else {
-            Err("could not find start vertex".to_string())
+                // update values for next iteration
+                visiting_label = visiting_vertex.as_ref().borrow().label();
+                visiting_score = state[&visiting_label]
+                    .get_score()
+                    .ok_or("could not get score of visiting vertex.")?;
+
+                // change the state to explored
+                state.insert(
+                    visiting_label,
+                    VertexState::Explored {
+                        score: visiting_score,
+                        coming_from: state[&visiting_label].get_path_backwards(),
+                    },
+                );
+            } else if state
+                .values()
+                .filter(|state| state.is_unexplored())
+                .collect::<Vec<&VertexState>>()
+                .len()
+                > 0
+            {
+                // if there is nothing estimated, but still some unexplored, we have a loop.
+                return Err(format!(
+                    "there is no way for getting from {} to {}. There is a loop.",
+                    start, end
+                ));
+            } else {
+                // we are done
+                return Ok(state);
+            }
         }
+
+        Ok(state)
     }
 }
 

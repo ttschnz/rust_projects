@@ -89,6 +89,13 @@ impl Vertex {
             .map(|edge| Rc::clone(&edge.borrow().to))
             .collect::<Vec<Rc<RefCell<Vertex>>>>()
     }
+
+    pub fn weighted_adjacent_vertices(&self) -> Vec<(Rc<RefCell<Vertex>>, usize)> {
+        self.edges()
+            .filter(|edge| edge.borrow().from.as_ref().borrow().deref() == self)
+            .map(|edge| (Rc::clone(&edge.borrow().to), edge.borrow().weight))
+            .collect::<Vec<(Rc<RefCell<Vertex>>, usize)>>()
+    }
 }
 
 #[derive(Debug)]
