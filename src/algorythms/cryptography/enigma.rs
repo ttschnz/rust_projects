@@ -1,3 +1,4 @@
+mod formatter;
 mod reflector;
 mod rotor;
 mod utils;
@@ -78,11 +79,14 @@ mod test {
 
     #[test]
     fn enigma() {
+        // assert_eq!(('A' as u8 - 65) as usize, 0);
+
         let mut enigma = Enigma::new(
             vec![RotorWiring::Iii, RotorWiring::Ii, RotorWiring::I],
             ReflectorWiring::B,
         );
-        println!("{}", enigma.encode("a").to_ascii_uppercase());
-        println!("{:?}", enigma.rotors);
+        println!("{:?}", enigma);
+        // println!("{}", enigma.encode("a").to_ascii_uppercase());
+        // println!("{:?}", enigma.rotors);
     }
 }

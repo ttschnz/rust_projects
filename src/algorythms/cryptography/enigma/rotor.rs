@@ -26,7 +26,7 @@ impl Into<Rotor> for RotorWiring {
 }
 
 pub struct Rotor {
-    configuration: [char; 26],
+    pub configuration: [char; 26],
     name: String,
     model_name: Option<String>,
     date_introduced: Option<String>,
@@ -134,5 +134,8 @@ impl Rotor {
     }
     pub fn set_carry_rotor(&mut self, rotor: Option<Rc<RefCell<Rotor>>>) {
         self.carry_rotor = rotor.clone();
+    }
+    pub fn get_name(&self) -> String {
+        self.name.clone()
     }
 }

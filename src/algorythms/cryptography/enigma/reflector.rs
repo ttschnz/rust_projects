@@ -20,7 +20,7 @@ impl Into<Reflector> for ReflectorWiring {
 }
 
 pub struct Reflector {
-    configuration: [char; 26],
+    pub configuration: [char; 26],
     name: String,
     model_name: Option<String>,
     date_introduced: Option<String>,
@@ -83,5 +83,8 @@ impl Reflector {
         } else {
             None
         }
+    }
+    pub fn get_name(&self) -> String {
+        self.name.clone()
     }
 }
