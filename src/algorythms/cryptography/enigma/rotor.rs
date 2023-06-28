@@ -2,7 +2,7 @@ use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use super::utils::n_abc;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum RotorWiring {
     Ic,
     Iic,
@@ -15,18 +15,54 @@ pub enum RotorWiring {
 impl Into<Rotor> for RotorWiring {
     fn into(self) -> Rotor {
         match self {
-            Self::Ic => Rotor::new("DMTWSILRUYQNKFEJCAZBPGXOHV", "IC").unwrap(),
-            Self::Iic => Rotor::new("HQZGPJTMOBLNCIFDYAWVEUSRKX", "IIC").unwrap(),
-            Self::Iiic => Rotor::new("UQNTLSZFMREHDPXKIBVYGJCWOA", "IIIC").unwrap(),
-            Self::I => Rotor::new("EKMFLGDQVZNTOWYHXUSPAIBRCJ", "I").unwrap(),
-            Self::Ii => Rotor::new("AJDKSIRUXBLHWTMCQGZNPYFVOE", "II").unwrap(),
-            Self::Iii => Rotor::new("BDFHJLCPRTXVZNYEIWGAKMUSQO", "III").unwrap(),
+            Self::Ic => Rotor::new(
+                [
+                    3, 12, 19, 22, 18, 8, 11, 17, 20, 24, 16, 13, 10, 5, 4, 9, 2, 0, 25, 1, 15, 6,
+                    23, 14, 7, 21,
+                ],
+                "Ic",
+            ),
+            Self::Iic => Rotor::new(
+                [
+                    7, 16, 25, 6, 15, 9, 19, 12, 14, 1, 11, 13, 2, 8, 5, 3, 24, 0, 22, 21, 4, 20,
+                    18, 17, 10, 23,
+                ],
+                "Iic",
+            ),
+            Self::Iiic => Rotor::new(
+                [
+                    20, 16, 13, 19, 11, 18, 25, 5, 12, 17, 4, 7, 3, 15, 23, 10, 8, 1, 21, 24, 6, 9,
+                    2, 22, 14, 0,
+                ],
+                "Iiic",
+            ),
+            Self::I => Rotor::new(
+                [
+                    4, 10, 12, 5, 11, 6, 3, 16, 21, 25, 13, 19, 14, 22, 24, 7, 23, 20, 18, 15, 0,
+                    8, 1, 17, 2, 9,
+                ],
+                "I",
+            ),
+            Self::Ii => Rotor::new(
+                [
+                    0, 9, 3, 10, 18, 8, 17, 20, 23, 1, 11, 7, 22, 19, 12, 2, 16, 6, 25, 13, 15, 24,
+                    5, 21, 14, 4,
+                ],
+                "Ii",
+            ),
+            Self::Iii => Rotor::new(
+                [
+                    1, 3, 5, 7, 9, 11, 2, 15, 17, 19, 23, 21, 25, 13, 24, 4, 8, 22, 6, 0, 10, 12,
+                    20, 18, 16, 14,
+                ],
+                "Iii",
+            ),
         }
     }
 }
 
 pub struct Rotor {
-    pub configuration: [char; 26],
+    pub wires: [usize; 26],
     name: String,
     model_name: Option<String>,
     date_introduced: Option<String>,
@@ -66,55 +102,29 @@ impl Debug for Rotor {
 }
 
 impl Rotor {
-    pub fn new(wires: &str, name: &str) -> Option<Rotor> {
-        match wires
-            .to_ascii_lowercase()
-            .chars()
-            .collect::<Vec<char>>()
-            .try_into()
-        {
-            Ok(configuration) => Some(Rotor {
-                configuration,
-                name: name.to_string(),
-                model_name: None,
-                date_introduced: None,
-                rotations: 0,
-                carry_rotor: None,
-            }),
-            _ => None,
+    pub fn new(wires: [usize; 26], name: &str) -> Rotor {
+        Rotor {
+            wires,
+            name: name.to_string(),
+            model_name: None,
+            date_introduced: None,
+            rotations: 0,
+            carry_rotor: None,
         }
     }
-    pub fn forward(&self, input: char) -> Option<char> {
-        let offset = 'a' as u8;
-        let limit = 'z' as u8;
-
-        let input = input.to_ascii_lowercase() as u8;
-        if input >= offset && input <= limit {
-            println!(
-                "translate {} in {} position. {}=>{}",
-                self.name,
-                n_abc(self.rotations as usize),
-                n_abc((input - offset) as usize),
-                self.configuration[((input - offset + self.rotations) % 26) as usize]
-                    .to_ascii_uppercase(),
-            );
-            Some(self.configuration[((input - offset + self.rotations) % 26) as usize])
-        } else {
-            None
-        }
+    pub fn forward(&self, input: usize) -> usize {
+        let index = (input + self.rotations as usize) & self.wires.len();
+        self.wires[index]
     }
 
-    pub fn backward(&self, input: char) -> Option<char> {
-        let offset = 'a' as u8;
-        if let Some((index, _)) = self
-            .configuration
-            .iter()
-            .enumerate()
-            .find(|(_, c)| *c == &(input.to_ascii_lowercase()))
-        {
-            Some((index as u8 + self.rotations + offset) as char)
+    pub fn backward(&self, input: usize) -> Option<usize> {
+        // input is value at certain index. this index - rotations is the output
+        // however, we need to do some kind of modulo. but i don't know where yet.
+
+        if let Some((index, _)) = self.wires.iter().enumerate().find(|(_, c)| *c == &(input)) {
+            Some(index - self.rotations as usize)
         } else {
-            println!("could not find {} in {:?}", input, self.configuration);
+            println!("could not find {} in {:?}", input, self.wires);
             None
         }
     }

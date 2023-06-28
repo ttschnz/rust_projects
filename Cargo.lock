@@ -12,6 +12,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ascii_table"
+version = "4.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75054ce561491263d7b80dc2f6f6c6f8cdfd0c7a7c17c5cf3b8117829fa72ae1"
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -149,6 +155,7 @@ checksum = "436b050e76ed2903236f032a59761c1eb99e1b0aead2c257922771dab1fc8c78"
 name = "ttschnz"
 version = "0.1.0"
 dependencies = [
+ "ascii_table",
  "colored",
  "itertools",
  "rand",
